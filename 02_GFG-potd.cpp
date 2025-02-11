@@ -13,7 +13,7 @@ struct Node {
         left = right = NULL;
     }
 };
-
+// Optimal Approach
 class Solution{
 
     int count = 0, result = -1;
