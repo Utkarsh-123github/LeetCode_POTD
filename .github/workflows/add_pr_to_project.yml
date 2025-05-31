@@ -1,19 +1,22 @@
-name: Add PR to GitHub Project (Ready to review)
+name: Auto Add PR to GitHub Project
 
 on:
   pull_request:
     types: [opened]
 
 jobs:
-  add-pr-to-project:
+  add-to-project:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+      - name: Install GitHub CLI
+        run: sudo apt update && sudo apt install gh -y
 
-      - name: Add PR to GitHub Project
+      - name: Add PR to Project
+        env:
+          GH_TOKEN: ${{ secrets.MY_PROJECT_TOKEN }}
         run: |
-          gh project item add \
-            --owner "${{ github.repository_owner }}" \
-            --url "${{ github.event.pull_request.html_url }}" \
-            --template "Ready to Review"
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          PR_URL="https://github.com/${{ github.repository }}/pull/$PR_NUMBER"
+
+          echo "Adding PR #$PR_NUMBER to project 1..."
+          gh project item-add 1 --owner Utkarsh-123github --url "$PR_URL"
