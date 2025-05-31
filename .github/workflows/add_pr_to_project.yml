@@ -1,4 +1,4 @@
-name: Auto Add PR to GitHub Project
+name: Auto Add PR to GitHub ProjectAdd commentMore actions
 
 on:
   pull_request:
@@ -11,72 +11,12 @@ jobs:
       - name: Install GitHub CLI
         run: sudo apt update && sudo apt install gh -y
 
-      - name: Move PR to "Ready to review"
+      - name: Add PR to Project
         env:
           GH_TOKEN: ${{ secrets.MY_PROJECT_TOKEN }}
         run: |
-          PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          PR_URL="https://github.com/${{ github.repository }}/pull/$PR_NUMBER"
 
-          # Get the project ID
-          PROJECT_ID=$(gh api graphql -f query='
-            query {
-              user(login: "Utkarsh-123github") {
-                projectV2(number: 1) { id }
-              }
-            }' --jq '.data.user.projectV2.id')
-
-          # Get the item ID for this PR
-          ITEM_ID=$(gh api graphql -f query='
-            query($projectId:ID!) {
-              node(id: $projectId) {
-                ... on ProjectV2 {
-                  items(first: 20) {
-                    nodes {
-                      id
-                      content {
-                        ... on PullRequest { url }
-                      }
-                    }
-                  }
-                }
-              }
-            }' -f projectId=$PROJECT_ID --jq '.data.node.items.nodes[] | select(.content.url=="'$PR_URL'") | .id')
-
-          # Get the Status field ID and the "Ready to review" option ID
-          FIELD_AND_OPTION=$(gh api graphql -f query='
-            query($projectId:ID!) {
-              node(id: $projectId) {
-                ... on ProjectV2 {
-                  fields(first: 20) {
-                    nodes {
-                      ... on ProjectV2SingleSelectField {
-                        id
-                        name
-                        options {
-                          id
-                          name
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }' -f projectId=$PROJECT_ID)
-
-          STATUS_FIELD_ID=$(echo "$FIELD_AND_OPTION" | jq -r '.data.node.fields.nodes[] | select(.name=="Status") | .id')
-          READY_OPTION_ID=$(echo "$FIELD_AND_OPTION" | jq -r '.data.node.fields.nodes[] | select(.name=="Status") | .options[] | select(.name=="Ready to review") | .id')
-
-          # Move the PR to "Ready to review"
-          gh api graphql -f query='
-            mutation($projectId:ID!, $itemId:ID!, $fieldId:ID!, $optionId:ID!) {
-              updateProjectV2ItemFieldValue(input: {
-                projectId: $projectId,
-                itemId: $itemId,
-                fieldId: $fieldId,
-                value: { singleSelectOptionId: $optionId }
-              }) {
-                projectV2Item {
-                  id
-                }
-              }
-            }' -f projectId=$PROJECT_ID -f itemId=$ITEM_ID -f fieldId=$STATUS_FIELD_ID -f optionId=$READY_OPTION_ID
+          echo "Adding PR #$PR_NUMBER to project 1..."
+          gh project item-add 1 --owner Utkarsh-123github --url "$PR_URL"
