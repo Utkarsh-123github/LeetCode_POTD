@@ -11,12 +11,53 @@ jobs:
       - name: Install GitHub CLI
         run: sudo apt update && sudo apt install gh -y
 
-      - name: Add PR to Project
+      - name: Move PR to "Ready to review"
         env:
           GH_TOKEN: ${{ secrets.MY_PROJECT_TOKEN }}
         run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          PR_URL="https://github.com/${{ github.repository }}/pull/$PR_NUMBER"
-
-          echo "Adding PR #$PR_NUMBER to project 1..."
-          gh project item-add 1 --owner Utkarsh-123github --url "$PR_URL"
+          PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
+          PROJECT_ID=$(gh api graphql -f query='
+            query {
+              user(login: "Utkarsh-123github") {
+                projectV2(number: 1) { id }
+              }
+            }' --jq '.data.user.projectV2.id')
+          ITEM_ID=$(gh api graphql -f query='
+            query($projectId:ID!,$prUrl:String!) {
+              projectV2(id: $projectId) {
+                items(first: 20) {
+                  nodes {
+                    id
+                    content {
+                      ... on PullRequest { url }
+                    }
+                  }
+                }
+              }
+            }' -f projectId=$PROJECT_ID -f prUrl=$PR_URL --jq '.data.projectV2.items.nodes[] | select(.content.url=="'$PR_URL'") | .id')
+          COLUMN_ID=$(gh api graphql -f query='
+            query($projectId:ID!) {
+              projectV2(id: $projectId) {
+                field(name: "Status") {
+                  ... on ProjectV2SingleSelectField { options { id name } }
+                }
+              }
+            }' -f projectId=$PROJECT_ID --jq '.data.projectV2.field.options[] | select(.name=="Ready to review") | .id')
+          gh api graphql -f query='
+            mutation($itemId:ID!,$fieldId:ID!,$optionId:ID!) {
+              updateProjectV2ItemFieldValue(input: {
+                projectId: "'$PROJECT_ID'",
+                itemId: $itemId,
+                fieldId: $fieldId,
+                value: { singleSelectOptionId: $optionId }
+              }) {
+                projectV2Item {
+                  id
+                }
+              }
+            }' -f itemId=$ITEM_ID -f fieldId=$(gh api graphql -f query='
+              query($projectId:ID!) {
+                projectV2(id: $projectId) {
+                  field(name: "Status") { id }
+                }
+              }' -f projectId=$PROJECT_ID --jq '.data.projectV2.field.id') -f optionId=$COLUMN_ID
