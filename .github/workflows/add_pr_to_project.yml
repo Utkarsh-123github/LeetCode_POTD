@@ -1,4 +1,4 @@
-name: Add PR to Project (Ready to review)
+name: Add PR to GitHub Project (Ready to review)
 
 on:
   pull_request:
@@ -8,26 +8,34 @@ jobs:
   add-to-project:
     runs-on: ubuntu-latest
     steps:
-      - name: Install GitHub CLI
-        run: sudo apt update && sudo apt install gh -y
+      - name: Install GitHub CLI and Projects v2 extension
+        run: |
+          sudo apt update && sudo apt install gh -y
+          gh extension install github/gh-projects
 
       - name: Authenticate GitHub CLI
         run: echo "${{ secrets.MY_PROJECT_TOKEN }}" | gh auth login --with-token
 
       - name: Add PR to project
         run: |
-          PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
-          gh project item-add --owner Utkarsh-123github --number 1 --url "$PR_URL"
+          gh projectv2 item-add \
+            --owner Utkarsh-123github \
+            --number 1 \
+            --url "https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
 
       - name: Set status to "Ready to review"
         run: |
           PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
-          gh project item-list --owner Utkarsh-123github --number 1 --format json > items.json
+          gh projectv2 item-list \
+            --owner Utkarsh-123github \
+            --number 1 \
+            --format json > items.json
 
           ITEM_ID=$(grep -B 1 "$PR_URL" items.json | grep '"id"' | head -n 1 | sed 's/[^"]*"\([^"]*\)".*/\1/')
 
-          gh project item-edit "$ITEM_ID" \
-            --owner Utkarsh-123github \
-            --number 1 \
+          echo "Found item ID: $ITEM_ID"
+
+          gh projectv2 item-edit \
+            --id "$ITEM_ID" \
             --field-id PVTSSF_lAHOBtVIJM4A6Ub7zgu8tMM \
-            --value-id f75ad846
+            --single-select-option-id f75ad846
