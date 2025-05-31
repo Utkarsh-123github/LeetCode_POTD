@@ -5,39 +5,15 @@ on:
     types: [opened]
 
 jobs:
-  add-to-project:
+  add-pr-to-project:
     runs-on: ubuntu-latest
     steps:
-      - name: Install GitHub CLI + Projects v2 extension
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Add PR to GitHub Project
         run: |
-          sudo apt update && sudo apt install gh -y
-          gh extension install github/gh-projects
-
-      - name: Authenticate GitHub CLI
-        run: echo "${{ secrets.MY_PROJECT_TOKEN }}" | gh auth login --with-token
-
-      - name: Add PR to project
-        run: |
-          gh projects item-add \
-            --owner Utkarsh-123github \
-            --number 1 \
-            --url "https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
-
-      - name: Get item ID for PR
-        id: get_item
-        run: |
-          PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
-          gh projects item-list \
-            --owner Utkarsh-123github \
-            --number 1 \
-            --format json > items.json
-
-          ITEM_ID=$(grep -B 1 "$PR_URL" items.json | grep '"id"' | head -n 1 | sed 's/[^"]*"\([^"]*\)".*/\1/')
-          echo "item_id=$ITEM_ID" >> $GITHUB_OUTPUT
-
-      - name: Set status field to Ready to review
-        run: |
-          gh projects item-edit \
-            --id "${{ steps.get_item.outputs.item_id }}" \
-            --field-id PVTSSF_lAHOBtVIJM4A6Ub7zgu8tMM \
-            --single-select-option-id f75ad846
+          gh project item add \
+            --owner "${{ github.repository_owner }}" \
+            --url "${{ github.event.pull_request.html_url }}" \
+            --template "Ready to Review"
