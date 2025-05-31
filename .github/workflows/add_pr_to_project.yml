@@ -1,11 +1,22 @@
-name: Test PR Workflow
+name: Auto Add PR to GitHub Project
 
 on:
   pull_request:
     types: [opened]
 
 jobs:
-  test:
+  add-to-project:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "✅ This workflow is running!"
+      - name: Install GitHub CLI
+        run: sudo apt update && sudo apt install gh -y
+
+      - name: Add PR to Project
+        env:
+          GH_TOKEN: ${{ secrets.MY_PROJECT_TOKEN }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          PR_URL="https://github.com/${{ github.repository }}/pull/$PR_NUMBER"
+
+          echo "Adding PR #$PR_NUMBER to project 1..."
+          gh project item-add 1 --owner Utkarsh-123github --url "$PR_URL"
