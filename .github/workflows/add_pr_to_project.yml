@@ -16,37 +16,61 @@ jobs:
           GH_TOKEN: ${{ secrets.MY_PROJECT_TOKEN }}
         run: |
           PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
+
+          # Get the project ID
           PROJECT_ID=$(gh api graphql -f query='
             query {
               user(login: "Utkarsh-123github") {
                 projectV2(number: 1) { id }
               }
             }' --jq '.data.user.projectV2.id')
+
+          # Get the item ID for this PR
           ITEM_ID=$(gh api graphql -f query='
-            query($projectId:ID!,$prUrl:String!) {
-              projectV2(id: $projectId) {
-                items(first: 20) {
-                  nodes {
-                    id
-                    content {
-                      ... on PullRequest { url }
+            query($projectId:ID!) {
+              node(id: $projectId) {
+                ... on ProjectV2 {
+                  items(first: 20) {
+                    nodes {
+                      id
+                      content {
+                        ... on PullRequest { url }
+                      }
                     }
                   }
                 }
               }
-            }' -f projectId=$PROJECT_ID -f prUrl=$PR_URL --jq '.data.projectV2.items.nodes[] | select(.content.url=="'$PR_URL'") | .id')
-          COLUMN_ID=$(gh api graphql -f query='
+            }' -f projectId=$PROJECT_ID --jq '.data.node.items.nodes[] | select(.content.url=="'$PR_URL'") | .id')
+
+          # Get the Status field ID and the "Ready to review" option ID
+          FIELD_AND_OPTION=$(gh api graphql -f query='
             query($projectId:ID!) {
-              projectV2(id: $projectId) {
-                field(name: "Status") {
-                  ... on ProjectV2SingleSelectField { options { id name } }
+              node(id: $projectId) {
+                ... on ProjectV2 {
+                  fields(first: 20) {
+                    nodes {
+                      ... on ProjectV2SingleSelectField {
+                        id
+                        name
+                        options {
+                          id
+                          name
+                        }
+                      }
+                    }
+                  }
                 }
               }
-            }' -f projectId=$PROJECT_ID --jq '.data.projectV2.field.options[] | select(.name=="Ready to review") | .id')
+            }' -f projectId=$PROJECT_ID)
+
+          STATUS_FIELD_ID=$(echo "$FIELD_AND_OPTION" | jq -r '.data.node.fields.nodes[] | select(.name=="Status") | .id')
+          READY_OPTION_ID=$(echo "$FIELD_AND_OPTION" | jq -r '.data.node.fields.nodes[] | select(.name=="Status") | .options[] | select(.name=="Ready to review") | .id')
+
+          # Move the PR to "Ready to review"
           gh api graphql -f query='
-            mutation($itemId:ID!,$fieldId:ID!,$optionId:ID!) {
+            mutation($projectId:ID!, $itemId:ID!, $fieldId:ID!, $optionId:ID!) {
               updateProjectV2ItemFieldValue(input: {
-                projectId: "'$PROJECT_ID'",
+                projectId: $projectId,
                 itemId: $itemId,
                 fieldId: $fieldId,
                 value: { singleSelectOptionId: $optionId }
@@ -55,9 +79,4 @@ jobs:
                   id
                 }
               }
-            }' -f itemId=$ITEM_ID -f fieldId=$(gh api graphql -f query='
-              query($projectId:ID!) {
-                projectV2(id: $projectId) {
-                  field(name: "Status") { id }
-                }
-              }' -f projectId=$PROJECT_ID --jq '.data.projectV2.field.id') -f optionId=$COLUMN_ID
+            }' -f projectId=$PROJECT_ID -f itemId=$ITEM_ID -f fieldId=$STATUS_FIELD_ID -f optionId=$READY_OPTION_ID
