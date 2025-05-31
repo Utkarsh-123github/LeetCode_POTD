@@ -1,0 +1,11 @@
+name: Hello World PR Trigger
+
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "✅ Hello! The PR trigger is working."
