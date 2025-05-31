@@ -1,4 +1,4 @@
-name: Auto Add PR to GitHub Project
+name: Add PR to Project (Ready to review)
 
 on:
   pull_request:
@@ -11,12 +11,26 @@ jobs:
       - name: Install GitHub CLI
         run: sudo apt update && sudo apt install gh -y
 
-      - name: Add PR to Project
-        env:
-          GH_TOKEN: ${{ secrets.MY_PROJECT_TOKEN }}
-        run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          PR_URL="https://github.com/${{ github.repository }}/pull/$PR_NUMBER"
+      - name: Authenticate GitHub CLI
+        run: echo "${{ secrets.MY_PROJECT_TOKEN }}" | gh auth login --with-token
 
-          echo "Adding PR #$PR_NUMBER to project 1..."
-          gh project item-add 1 --owner Utkarsh-123github --url "$PR_URL"
+      - name: Add PR to project in "Ready to review" column
+        run: |
+          PR_URL="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
+
+          # Add the PR to the project
+          gh project item-add \
+            --project-id PVT_kwHOBtVIJM4A6Ub7 \
+            --url "$PR_URL"
+
+          # Wait a few seconds to ensure item is added before fetching it
+          sleep 5
+
+          # Find the item ID (without jq)
+          ITEM_ID=$(gh project item-list --project-id PVT_kwHOBtVIJM4A6Ub7 --format json | grep -B 1 "$PR_URL" | grep '"id"' | head -n 1 | sed 's/[^"]*"\([^"]*\)".*/\1/')
+
+          # Set status to "Ready to review"
+          gh project item-edit "$ITEM_ID" \
+            --project-id PVT_kwHOBtVIJM4A6Ub7 \
+            --field-id PVTSSF_lAHOBtVIJM4A6Ub7zgu8tMM \
+            --value-id f75ad846
