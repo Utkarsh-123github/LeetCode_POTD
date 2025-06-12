@@ -1,4 +1,4 @@
-name: Auto Add PR to GitHub ProjectAdd commentMore actionsAdd commentMore actions
+name: Auto Add PR to GitHub Project
 
 on:
   pull_request:
